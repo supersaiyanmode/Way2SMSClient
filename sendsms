@@ -1,0 +1,66 @@
+#!/usr/bin/python
+import urllib, urllib2
+import mechanize
+import cookielib
+import sys
+import time
+import os
+
+
+class Way2SMS(object):
+    def __init__(self, username, pwd):
+        self.username, self.password = username,pwd
+        self.br = mechanize.Browser()
+        
+        self.br.set_cookiejar(cookielib.LWPCookieJar())
+        self.br.set_handle_equiv(True)
+        self.br.set_handle_redirect(True)
+        self.br.set_handle_referer(True)
+        self.br.set_handle_robots(False)
+        # Follows refresh 0 but not hangs on refresh > 0
+        self.br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
+        self.br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
+        
+        self._loginStatus = None
+    
+    def _login(self):
+        if self._loginStatus is None:
+            self.br.open("http://site5.way2sms.com/entry.jsp")
+            self.br.select_form("loginform")
+            self.br.form.action = "http://site5.way2sms.com/Login1.action"
+            self.br['username'] = self.username
+            self.br['password'] = self.password
+            res = self.br.submit().read()
+            open('loginDone.html','w').write(res)
+            if self.username in res:
+                print "Login success!"
+                self._loginStatus = True
+            else:
+                print "Unable to login!"    
+                self._loginStatus = False
+        return self._loginStatus
+    
+    def send(self, to, msg):
+        self._login()
+        r = self.br.open('http://site5.way2sms.com/jsp/InstantSMS.jsp')
+        #open('test.html','w').write(r.read())
+        self.br.select_form('InstantSMS')
+        self.br['MobNo'] = to
+        self.br['textArea'] = msg
+        res = self.br.submit().read()
+        if 'has been submitted successfully' in res:
+            return True
+        else:
+            print "Unknown condition.."
+            return False
+        #open('Sent.html','w').write(res)
+
+if __name__ == "__main__":
+    to = sys.argv[1]
+    msg = ' '.join(sys.argv[2:])
+    
+    path = os.path.join(os.path.dirname(__file__),'.sendsms-config')
+    userDetails = [x.strip() for x in open(path).read().split()]
+    
+    if Way2SMS(userDetails[0],userDetails[1]).send(to,msg):
+        print "Sent to %s: %s"%(to,msg)
